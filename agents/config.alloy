@@ -1,0 +1,45 @@
+// Grafana Alloy config for each server (web server, Coolify).
+// Ships the system journal (and web server logs) to Loki.
+// Install to /etc/alloy/config.alloy, then replace:
+//   MONITORING_IP -> the monitoring container's IP
+//   HOSTNAME      -> webserver / coolify (must match the Prometheus "host" label)
+
+loki.write "default" {
+  endpoint {
+    url = "http://MONITORING_IP:3100/loki/api/v1/push"
+  }
+}
+
+// --- systemd journal: every service's logs, labelled by unit ---
+loki.relabel "journal" {
+  forward_to = []
+
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+  rule {
+    source_labels = ["__journal_priority_keyword"]
+    target_label  = "level"
+  }
+}
+
+loki.source.journal "journal" {
+  max_age       = "12h"
+  relabel_rules = loki.relabel.journal.rules
+  forward_to    = [loki.write.default.receiver]
+  labels        = { host = "HOSTNAME", job = "journal" }
+}
+
+// --- web server access/error logs (keep the line that matches your server) ---
+local.file_match "web" {
+  path_targets = [
+    { __path__ = "/var/log/nginx/*.log",   host = "HOSTNAME", job = "web" },
+    // { __path__ = "/var/log/apache2/*.log", host = "HOSTNAME", job = "web" },
+  ]
+}
+
+loki.source.file "web" {
+  targets    = local.file_match.web.targets
+  forward_to = [loki.write.default.receiver]
+}

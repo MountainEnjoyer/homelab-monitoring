@@ -1,0 +1,7 @@
+# Copy to pve.yml and paste the token value printed by `pveum user token add`.
+# pve.yml is git-ignored: never commit the real token.
+default:
+  user: prometheus@pve
+  token_name: monitoring
+  token_value: PASTE-TOKEN-VALUE-HERE
+  verify_ssl: false     # Proxmox uses a self-signed certificate by default

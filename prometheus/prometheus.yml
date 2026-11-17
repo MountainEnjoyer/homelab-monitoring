@@ -1,0 +1,41 @@
+# Replace the placeholder IPs before starting:
+#   PROXMOX_IP    -> your Proxmox host (e.g. 192.168.1.10)
+#   WEBSERVER_IP  -> the Debian web server VM
+#   COOLIFY_IP    -> the Ubuntu Coolify VM
+
+global:
+  scrape_interval: 30s        # 30s instead of 15s: half the RAM/disk, plenty for a homelab
+  evaluation_interval: 30s
+
+scrape_configs:
+  # The monitoring stack watching itself
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # System metrics (CPU, RAM, disk, network) from node_exporter on each machine
+  - job_name: node
+    static_configs:
+      - targets: ["PROXMOX_IP:9100"]
+        labels: { host: proxmox, role: hypervisor }
+      - targets: ["WEBSERVER_IP:9100"]
+        labels: { host: webserver, role: web }
+      - targets: ["COOLIFY_IP:9100"]
+        labels: { host: coolify, role: paas }
+
+  # Proxmox API metrics: every VM/LXC's status, CPU, RAM, disk, uptime
+  - job_name: pve
+    metrics_path: /pve
+    params:
+      module: [default]
+      cluster: ["1"]
+      node: ["1"]
+    static_configs:
+      - targets: ["PROXMOX_IP"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: pve-exporter:9221
